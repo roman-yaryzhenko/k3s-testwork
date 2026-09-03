@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - auth-deployment.yaml
+  - auth-service.yaml
+  - catalog-deployment.yaml
+  - catalog-service.yaml
+  - order-deployment.yaml
+  - order-service.yaml
+
+namespace: devops-test
+
+images:
+  - name: auth-svc
+    newName: ghcr.io/roman-yaryzhenko/auth-svc
+    newTag: 3eb8781
+  - name: catalog-svc
+    newName: ghcr.io/roman-yaryzhenko/catalog-svc
+    newTag: 3eb8781
+  - name: order-svc
+    newName: ghcr.io/roman-yaryzhenko/order-svc
+    newTag: 3eb8781
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - AUTH_URL=http://auth-svc:3000
+      - CATALOG_URL=http://catalog-svc:8000
+      - HPA_DEMO_CPU_WORK_MS=0
+
+secretGenerator:
+  - name: auth-secret
+    envs:
+      - secrets.env

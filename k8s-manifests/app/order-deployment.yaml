@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-svc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-svc
+  template:
+    metadata:
+      labels:
+        app: order-svc
+    spec:
+      containers:
+        - name: order-svc
+          image: order-svc:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: AUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: AUTH_URL
+            - name: CATALOG_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: CATALOG_URL
+            - name: HPA_DEMO_CPU_WORK_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: HPA_DEMO_CPU_WORK_MS
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

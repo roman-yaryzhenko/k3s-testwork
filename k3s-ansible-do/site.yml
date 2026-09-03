@@ -1,0 +1,77 @@
+---
+- name: Provision K3s cluster
+  ansible.builtin.import_playbook: k3s.orchestration.site
+
+- name: Reconcile K3s serving certificate SANs
+  hosts: server
+  become: true
+  serial: 1
+
+  tasks:
+    - name: Read current K3s serving certificate SANs
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          timeout 10 openssl s_client \
+            -connect 127.0.0.1:6443 \
+            -servername kubernetes \
+            </dev/null 2>/dev/null \
+            | openssl x509 -noout -ext subjectAltName
+        executable: /bin/bash
+      register: k3s_serving_certificate
+      changed_when: false
+
+    - name: Initialize missing serving certificate SANs
+      ansible.builtin.set_fact:
+        k3s_missing_tls_sans: []
+
+    - name: Find missing serving certificate SANs
+      ansible.builtin.set_fact:
+        k3s_missing_tls_sans: "{{ k3s_missing_tls_sans + [item] }}"
+      loop: "{{ k3s_tls_sans }}"
+      when: >-
+        (
+          k3s_serving_certificate.stdout
+          | regex_search(
+              '(?:DNS:|IP Address:)'
+              ~ (item | regex_escape)
+              ~ '(?:,|$)'
+            )
+        ) is none
+
+    - name: Rotate K3s serving certificate when SANs changed
+      when: k3s_missing_tls_sans | length > 0
+      block:
+        - name: Stop K3s before serving certificate rotation
+          ansible.builtin.service:
+            name: k3s
+            state: stopped
+
+        - name: Rotate K3s serving certificate
+          ansible.builtin.command:
+            cmd: k3s certificate rotate --service k3s-server
+          changed_when: true
+
+      always:
+        - name: Start K3s after serving certificate rotation
+          ansible.builtin.service:
+            name: k3s
+            state: started
+          when: k3s_missing_tls_sans | length > 0
+
+        - name: Wait for K3s API port after serving certificate rotation
+          ansible.builtin.wait_for:
+            host: "{{ k3s_private_ip }}"
+            port: 6443
+            timeout: 60
+          when: k3s_missing_tls_sans | length > 0
+
+        - name: Wait for K3s API readiness after serving certificate rotation
+          ansible.builtin.command:
+            cmd: k3s kubectl get --raw=/readyz
+          register: k3s_api_ready
+          retries: 12
+          delay: 5
+          until: k3s_api_ready.rc == 0 and 'ok' in k3s_api_ready.stdout
+          changed_when: false
+          when: k3s_missing_tls_sans | length > 0

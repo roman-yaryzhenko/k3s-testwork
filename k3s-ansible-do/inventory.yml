@@ -1,0 +1,66 @@
+---
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        devops-node-1:
+          ansible_host: "167.99.249.142"
+          k3s_private_ip: "10.150.0.2"
+          k3s_external_dns: "devops-node-1.k3s-test-cluster.yaryzhenko.com"
+        devops-node-2:
+          ansible_host: "46.101.150.44"
+          k3s_private_ip: "10.150.0.3"
+          k3s_external_dns: "devops-node-2.k3s-test-cluster.yaryzhenko.com"
+        devops-node-3:
+          ansible_host: "164.92.181.214"
+          k3s_private_ip: "10.150.0.4"
+          k3s_external_dns: "devops-node-3.k3s-test-cluster.yaryzhenko.com"
+
+
+  vars:
+    ansible_user: root
+    ansible_port: 22
+
+    # One external DNS name for the Kubernetes API. Until an external LB is
+    # available, publish A records for all three server public IP addresses.
+    k3s_api_dns: "k3s-test-cluster-api.yaryzhenko.com"
+
+    # Current K3s stable channel as of 2026-09-02.
+    k3s_version: "v1.36.3+k3s1"
+
+    # No external LB/VIP yet: use the first server's VPC address as the
+    # registration/bootstrap endpoint. Existing K3s servers keep the complete
+    # server list internally after joining the cluster.
+    api_endpoint: >-
+      {{ hostvars[groups['server'][0]].k3s_private_ip }}
+
+    # Use the same serving-certificate SAN set on every K3s server. It covers
+    # the private bootstrap endpoint, the cluster-wide API DNS name, all
+    # per-node external DNS names, and every public server address.
+    k3s_tls_sans: >-
+      {{
+        [api_endpoint, k3s_api_dns]
+        + (groups['server'] | map('extract', hostvars, 'k3s_external_dns') | list)
+        + (groups['server'] | map('extract', hostvars, 'ansible_host') | list)
+      }}
+
+    # Keep Kubernetes, etcd and Flannel node traffic on the DigitalOcean VPC.
+    # Node identity and externally advertised addresses are explicit instead
+    # of being inferred from the Droplet hostname or interface selection.
+    server_config_yaml: |
+      node-name: "{{ inventory_hostname }}"
+      node-ip: "{{ k3s_private_ip }}"
+      node-external-ip: "{{ ansible_host }}"
+      node-external-dns: "{{ k3s_external_dns }}"
+      advertise-address: "{{ k3s_private_ip }}"
+      flannel-iface: "eth1"
+      tls-san: {{ k3s_tls_sans | to_json }}
+
+    # k3s-ansible 1.2.x can create the token on the first server and retrieve
+    # it on subsequent runs, so no cluster secret is stored in this archive.
+    # token: "..."
+
+    # The official role does not need to manage a host firewall here.
+    # Ensure the DigitalOcean/VPC and local firewall rules described in
+    # README.md are already in place.
+    manage_firewall: false

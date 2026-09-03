@@ -1,0 +1,5 @@
+---
+profile: production
+strict: true
+exclude_paths:
+  - .ansible/
