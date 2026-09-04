@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - vmsingle.yaml
+  - node-exporter.yaml
+  - kube-state-metrics.yaml
+  - vmalert.yaml
+  - grafana.yaml
+  - alertmanager-ingress.yaml
+
+configMapGenerator:
+  - name: k8s-testwork-dashboards
+    namespace: monitoring
+    files:
+      - cluster-health.json=dashboards/cluster-health.json
+      - service-slo.json=dashboards/service-slo.json
+
+secretGenerator:
+  - name: grafana-admin
+    namespace: monitoring
+    envs:
+      - secrets/grafana.env
+
+  - name: alertmanager-basic-auth
+    namespace: monitoring
+    files:
+      - users=secrets/alertmanager.htpasswd
+
+generatorOptions:
+  disableNameSuffixHash: true

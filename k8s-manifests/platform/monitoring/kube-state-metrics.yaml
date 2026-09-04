@@ -1,0 +1,31 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kube-state-metrics
+  namespace: kube-system
+spec:
+  repo: https://prometheus-community.github.io/helm-charts
+  chart: kube-state-metrics
+  version: 8.4.1
+  targetNamespace: monitoring
+  createNamespace: true
+  valuesContent: |-
+    fullnameOverride: kube-state-metrics
+
+    collectors:
+      - pods
+      - deployments
+      - nodes
+      - horizontalpodautoscalers
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 24Mi
+      limits:
+        cpu: 75m
+        memory: 96Mi
+
+    prometheus:
+      monitor:
+        enabled: false

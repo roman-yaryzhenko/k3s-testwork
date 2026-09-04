@@ -1,0 +1,103 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: grafana
+  namespace: kube-system
+spec:
+  repo: https://grafana-community.github.io/helm-charts
+  chart: grafana
+  version: 12.11.2
+  targetNamespace: monitoring
+  createNamespace: true
+  valuesContent: |-
+    fullnameOverride: grafana
+
+    admin:
+      existingSecret: grafana-admin
+      userKey: GRAFANA_ADMIN_USER
+      passwordKey: GRAFANA_ADMIN_PASSWORD
+
+    persistence:
+      enabled: false
+
+    testFramework:
+      enabled: false
+
+    resources:
+      requests:
+        cpu: 40m
+        memory: 384Mi
+      limits:
+        cpu: 250m
+        memory: 640Mi
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: vmsingle
+              topologyKey: kubernetes.io/hostname
+
+    grafana.ini:
+      analytics:
+        check_for_updates: false
+        reporting_enabled: false
+      auth.anonymous:
+        enabled: false
+      users:
+        allow_sign_up: false
+      log:
+        level: warn
+
+    sidecar:
+      dashboards:
+        enabled: false
+      datasources:
+        enabled: false
+
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        prune: true
+        datasources:
+          - name: VictoriaMetrics
+            uid: prometheus
+            type: prometheus
+            access: proxy
+            url: http://vmsingle.monitoring.svc:8428
+            isDefault: true
+            editable: false
+            jsonData:
+              httpMethod: POST
+              timeInterval: 15s
+
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: k8s-testwork
+            orgId: 1
+            folder: ""
+            type: file
+            disableDeletion: true
+            editable: false
+            options:
+              path: /var/lib/grafana/dashboards/k8s-testwork
+
+    dashboardsConfigMaps:
+      k8s-testwork: k8s-testwork-dashboards
+
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - grafana.k3s-test-cluster.yaryzhenko.com
+      tls:
+        - secretName: grafana-tls
+          hosts:
+            - grafana.k3s-test-cluster.yaryzhenko.com

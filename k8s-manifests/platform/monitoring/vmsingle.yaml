@@ -1,0 +1,157 @@
+# Minimal monitoring stack for k8s-testwork.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: vmsingle
+  namespace: kube-system
+spec:
+  repo: https://victoriametrics.github.io/helm-charts/
+  chart: victoria-metrics-single
+  version: 0.45.0
+  targetNamespace: monitoring
+  createNamespace: true
+  valuesContent: |-
+    server:
+      fullnameOverride: vmsingle
+      mode: deployment
+      retentionPeriod: 1d
+
+      persistentVolume:
+        enabled: false
+      emptyDir:
+        sizeLimit: 512Mi
+
+      resources:
+        requests:
+          cpu: 50m
+          memory: 320Mi
+        limits:
+          cpu: 300m
+          memory: 512Mi
+
+      extraArgs:
+        loggerLevel: WARN
+        inmemoryDataFlushInterval: 30s
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: grafana
+                topologyKey: kubernetes.io/hostname
+
+      scrape:
+        enabled: true
+        config:
+          global:
+            scrape_interval: 30s
+            scrape_timeout: 5s
+
+          scrape_configs:
+            - job_name: kubernetes-apiserver
+              scrape_interval: 30s
+              kubernetes_sd_configs:
+                - role: endpointslices
+              scheme: https
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecure_skip_verify: true
+              relabel_configs:
+                - action: keep
+                  source_labels:
+                    - __meta_kubernetes_namespace
+                    - __meta_kubernetes_service_name
+                    - __meta_kubernetes_endpointslice_port_name
+                  regex: default;kubernetes;https
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [__name__]
+                  regex: apiserver_request_duration_seconds_(sum|count)
+                - action: keep
+                  source_labels: [verb, resource]
+                  regex: GET;pods
+
+            - job_name: kubelet-cadvisor
+              scrape_interval: 15s
+              scrape_timeout: 10s
+              kubernetes_sd_configs:
+                - role: node
+              metrics_path: /metrics/cadvisor
+              scheme: https
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecure_skip_verify: true
+              honor_timestamps: false
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [namespace]
+                  regex: devops-test
+                - action: keep
+                  source_labels: [__name__]
+                  regex: container_(cpu_usage_seconds_total|memory_working_set_bytes)
+
+            - job_name: node-exporter
+              scrape_interval: 30s
+              kubernetes_sd_configs:
+                - role: endpointslices
+              relabel_configs:
+                - action: keep
+                  source_labels:
+                    - __meta_kubernetes_namespace
+                    - __meta_kubernetes_service_name
+                    - __meta_kubernetes_endpointslice_port_name
+                  regex: monitoring;node-exporter;metrics
+                - action: keep
+                  source_labels: [__meta_kubernetes_endpointslice_endpoint_conditions_ready]
+                  regex: "true"
+                - source_labels: [__meta_kubernetes_endpointslice_endpoint_node_name]
+                  target_label: node
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [__name__]
+                  regex: node_(cpu_seconds_total|memory_MemAvailable_bytes|memory_MemTotal_bytes|load1|load5|load15)
+
+            - job_name: kube-state-metrics
+              scrape_interval: 15s
+              static_configs:
+                - targets:
+                    - kube-state-metrics.monitoring.svc:8080
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [__name__]
+                  regex: >-
+                    kube_(pod_container_status_restarts_total|pod_status_ready|pod_status_phase|pod_container_resource_requests|deployment_status_replicas_ready|deployment_status_replicas_available|deployment_spec_replicas|node_status_condition|horizontalpodautoscaler_status_current_replicas|horizontalpodautoscaler_status_desired_replicas|horizontalpodautoscaler_status_condition|horizontalpodautoscaler_spec_min_replicas|horizontalpodautoscaler_spec_max_replicas|horizontalpodautoscaler_spec_target_metric|horizontalpodautoscaler_status_target_metric)
+
+            - job_name: demo-app
+              scrape_interval: 15s
+              kubernetes_sd_configs:
+                - role: endpointslices
+              relabel_configs:
+                - action: keep
+                  source_labels: [__meta_kubernetes_namespace]
+                  regex: devops-test
+                - action: keep
+                  source_labels: [__meta_kubernetes_service_name]
+                  regex: auth-svc|catalog-svc|order-svc
+                - action: keep
+                  source_labels: [__meta_kubernetes_endpointslice_port_name]
+                  regex: http
+                - action: keep
+                  source_labels: [__meta_kubernetes_endpointslice_endpoint_conditions_ready]
+                  regex: "true"
+                - source_labels: [__meta_kubernetes_namespace]
+                  target_label: namespace
+                - source_labels: [__meta_kubernetes_service_name]
+                  target_label: service
+              metric_relabel_configs:
+                - action: keep
+                  source_labels: [__name__]
+                  regex: http_(requests_total|request_duration_seconds_bucket)

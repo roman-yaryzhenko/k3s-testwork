@@ -1,0 +1,76 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: vmalert
+  namespace: kube-system
+spec:
+  repo: https://victoriametrics.github.io/helm-charts/
+  chart: victoria-metrics-alert
+  version: 0.47.0
+  targetNamespace: monitoring
+  createNamespace: true
+  valuesContent: |-
+    server:
+      fullnameOverride: vmalert
+
+      datasource:
+        url: http://vmsingle.monitoring.svc:8428
+
+      notifier:
+        url: http://alertmanager.monitoring.svc:9093
+
+      extraArgs:
+        evaluationInterval: 30s
+        loggerLevel: WARN
+
+      resources:
+        requests:
+          cpu: 10m
+          memory: 24Mi
+        limits:
+          cpu: 75m
+          memory: 96Mi
+
+      config:
+        alerts:
+          groups:
+            - name: demo-app.availability
+              interval: 30s
+              rules:
+                - alert: DemoAppServiceNoReadyPods
+                  expr: |-
+                    kube_deployment_status_replicas_ready{
+                      namespace="devops-test",
+                      deployment=~"auth-svc|catalog-svc|order-svc"
+                    } == 0
+                  for: 2m
+                  labels:
+                    severity: critical
+                    project: k8s-testwork
+                    application: demo-app
+                  annotations:
+                    summary: "{{ $labels.deployment }} has no ready pods"
+                    description: >-
+                      Deployment {{ $labels.deployment }} in namespace
+                      {{ $labels.namespace }} has reported 0 ready replicas for 2 minutes.
+
+    alertmanager:
+      enabled: true
+      fullnameOverride: alertmanager
+      mode: deployment
+      replicaCount: 1
+      retention: 1h
+
+      persistentVolume:
+        enabled: false
+
+      extraArgs:
+        log.level: warn
+
+      resources:
+        requests:
+          cpu: 5m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
