@@ -9,6 +9,7 @@ resources:
   - catalog-service.yaml
   - order-deployment.yaml
   - order-service.yaml
+  - order-hpa.yaml
   - ingress.yaml
   - middleware.yaml
 
