@@ -35,4 +35,4 @@ configMapGenerator:
 secretGenerator:
   - name: auth-secret
     envs:
-      - secrets/auth-svc.env
+      - secrets/auth-svc.env.enc

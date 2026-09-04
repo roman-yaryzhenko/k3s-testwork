@@ -1,0 +1,50 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: monitoring
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 15s
+  timeout: 3m
+
+  path: ./k8s-manifests/platform/monitoring
+  prune: true
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  dependsOn:
+    - name: cert-manager-issuers
+
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: grafana
+      namespace: monitoring
+
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmsingle
+      namespace: monitoring
+
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: kube-state-metrics
+      namespace: monitoring
+
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmalert
+      namespace: monitoring
+
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: alertmanager
+      namespace: monitoring

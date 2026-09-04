@@ -9,6 +9,8 @@ resources:
   - vmalert.yaml
   - grafana.yaml
   - alertmanager-ingress.yaml
+  - secrets/grafana-admin.yaml
+  - secrets/alertmanager-auth.yaml
 
 configMapGenerator:
   - name: k8s-testwork-dashboards
@@ -16,17 +18,6 @@ configMapGenerator:
     files:
       - cluster-health.json=dashboards/cluster-health.json
       - service-slo.json=dashboards/service-slo.json
-
-secretGenerator:
-  - name: grafana-admin
-    namespace: monitoring
-    envs:
-      - secrets/grafana.env
-
-  - name: alertmanager-basic-auth
-    namespace: monitoring
-    files:
-      - users=secrets/alertmanager.htpasswd
 
 generatorOptions:
   disableNameSuffixHash: true

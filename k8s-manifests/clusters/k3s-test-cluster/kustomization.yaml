@@ -5,3 +5,5 @@ resources:
   - flux-system/
   - cert-manager.yaml
   - cert-manager-issuers.yaml
+  - monitoring.yaml
+  - demo-app.yaml
