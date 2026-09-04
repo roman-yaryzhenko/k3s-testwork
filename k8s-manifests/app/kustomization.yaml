@@ -9,6 +9,8 @@ resources:
   - catalog-service.yaml
   - order-deployment.yaml
   - order-service.yaml
+  - ingress.yaml
+  - middleware.yaml
 
 namespace: devops-test
 
@@ -33,4 +35,4 @@ configMapGenerator:
 secretGenerator:
   - name: auth-secret
     envs:
-      - secrets.env
+      - secrets/auth-svc.env
