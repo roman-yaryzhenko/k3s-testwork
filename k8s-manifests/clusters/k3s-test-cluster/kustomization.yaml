@@ -3,3 +3,5 @@ kind: Kustomization
 
 resources:
   - flux-system/
+  - cert-manager.yaml
+  - cert-manager-issuers.yaml
