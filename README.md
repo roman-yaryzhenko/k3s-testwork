@@ -48,6 +48,97 @@
 13. HPA -- выбор метрик для теста. Смог подобрать такие, чтобы и кластер не уронить, и протестировать
 
 ## Воспроизведение
+
+Далее подразумевается, что развертывание происходит из этого репозитория и у вас есть приватные ssh-key и age-key. Также подразумевается, что у вас установлены все необходимые утилиты. 
+
+Вы находитесь в корне репозитория:
+
+```sh
+# Создаем venv и применяем его переменнын
+python3 -m venv ~/k3s-test-cluster-ansible-venv 
+source ~/k3s-test-cluster-ansible-venv/bin/activate
+# Устанавливаем корневой requirements.txt и идем в каталог Ansible
+pip3 install -r requirements.txt
+cd k3s-ansible-do
+# Устанавливаем коллекции Ansible
+ansible-galaxy collection install -r requirements.yml -p ./.ansible/collections
+# Запускаем play (подразумевается, что приватный ssh-ключ
+# лежит в ~/.ssh/k3s_devops_test_id_ed25519, а также что
+# вы хоть раз заходили с ним на каждую из нод и по ip, и по имени)
+ansible-playbook site.yml   -u root \
+    --private-key ~/.ssh/k3s_devops_test_id_ed25519 \
+    --forks=1
+# После выполнения Play скачиваем креды с первой ноды
+mkdir -p ~/.kube
+
+scp -i ~/.ssh/k3s_devops_test_id_ed25519 \
+  root@devops-node-1.k3s-test-cluster.yaryzhenko.com:/etc/rancher/k3s/k3s.yaml \
+  ~/.kube/k3s-test-cluster.yaml
+
+chmod 600 ~/.kube/k3s-test-cluster.yaml
+
+sed -i.bak \
+  's#https://127\.0\.0\.1:6443#https://k3s-test-cluster-api.yaryzhenko.com:6443#' \
+  ~/.kube/k3s-test-cluster.yaml
+
+# Переходим на верхний уровень репозитория
+cd ..
+# И задаем релевантные переменные окружения
+# (не буду в дальнейшем писать "подразумевается...")
+
+export KUBECONFIG=~/.kube/k3s-test-cluster.yaml
+export SOPS_AGE_KEY_FILE=.sops/age.agekey
+
+FLUX_DIR=k8s-manifests/clusters/k3s-test-cluster/flux-system
+# Создаем namespace flux-system
+kubectl create namespace flux-system \
+  --dry-run=client -o yaml | kubectl apply -f -
+# Добавляем приватный age-key
+kubectl -n flux-system create secret generic sops-age \
+  --from-file=age.agekey="$SOPS_AGE_KEY_FILE" \
+  --dry-run=client -o yaml | kubectl apply -f -
+  
+# Устанавливаем в кластере Flux
+
+kubectl apply -f "$FLUX_DIR/gotk-components.yaml"
+
+kubectl wait \
+  -n flux-system \
+  --for=condition=Available \
+  --timeout=180s \
+  deployment/source-controller \
+  deployment/kustomize-controller
+# Применяем kustomization и ждем согласования Flux
+kubectl apply -k "$FLUX_DIR"
+kubectl wait \
+  -n flux-system \
+  --for=condition=Ready \
+  --timeout=180s \
+  gitrepository/flux-system \
+  kustomization/flux-system
+# Ждем полного развертывания и смотрим, что получилось
+# (в списке должно быть, в частности, demo-app)
+kubectl wait \
+  -n flux-system \
+  --for=condition=Ready \
+  --timeout=10m \
+  kustomization/cert-manager \
+  kustomization/cert-manager-issuers \
+  kustomization/monitoring \
+  kustomization/demo-app
+kubectl get kustomizations -n flux-system
+kubectl get pods -A
+kubectl get ingress -A
+kubectl get certificate -A
+kubectl get hpa -n devops-test
+# Также можно проверить самим Flux
+flux get sources git -A
+flux get kustomizations -A
+# Все, кластер должжен находиться в рабочем состоянии. :)
+
+
+```
+
 # Демо
 # Заметки
 ## Косяки ТЗ
