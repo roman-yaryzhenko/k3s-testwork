@@ -37,4 +37,4 @@ spec:
         - type: Percent
           value: 50
           periodSeconds: 60
-      selectPolicy: Max4
+      selectPolicy: Max
