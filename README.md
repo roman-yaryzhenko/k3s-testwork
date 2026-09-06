@@ -64,9 +64,7 @@
 
 Вы находитесь в корне склонированного репозитория:
 
-<details>
-<summary> Показать команды</summary>
-```sh
+``sh
 # Создаем venv и применяем его переменнын
 python3 -m venv ~/k3s-test-cluster-ansible-venv 
 source ~/k3s-test-cluster-ansible-venv/bin/activate
@@ -153,7 +151,7 @@ flux get sources git -A
 flux get kustomizations -A
 # Все, кластер должжен находиться в рабочем состоянии. :)
 ```
-</details>
+
 # Демо
 
 Видео отправлено в Telegram; некоторые скриншоты ниже.
