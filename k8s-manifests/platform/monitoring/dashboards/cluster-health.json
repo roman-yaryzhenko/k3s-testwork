@@ -371,13 +371,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(apiserver_request_duration_seconds_sum{verb=\"GET\",resource=\"pods\"}[5m])) / sum(rate(apiserver_request_duration_seconds_count{verb=\"GET\",resource=\"pods\"}[5m]))",
-          "legendFormat": "GET /pods",
+          "expr": "sum(rate(apiserver_request_duration_seconds_sum{verb=\"LIST\",resource=\"pods\"}[5m])) / sum(rate(apiserver_request_duration_seconds_count{verb=\"LIST\",resource=\"pods\"}[5m]))",
+          "legendFormat": "LIST /pods",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Kube API GET pods latency",
+      "title": "Kube API LIST pods latency",
       "type": "timeseries"
     },
     {

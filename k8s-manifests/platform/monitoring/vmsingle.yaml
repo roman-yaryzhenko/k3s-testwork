@@ -73,7 +73,7 @@ spec:
                   regex: apiserver_request_duration_seconds_(sum|count)
                 - action: keep
                   source_labels: [verb, resource]
-                  regex: GET;pods
+                  regex: LIST;pods
 
             - job_name: kubelet-cadvisor
               scrape_interval: 15s
