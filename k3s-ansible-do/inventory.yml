@@ -50,7 +50,12 @@ k3s_cluster:
     server_config_yaml: |
       node-name: "{{ inventory_hostname }}"
       node-ip: "{{ k3s_private_ip }}"
+      # tune memory consumption
       disable-network-policy: true
+      kubelet-arg:
+        - "kube-reserved=cpu=100m,memory=768Mi"
+        - "system-reserved=cpu=50m,memory=128Mi"
+      # for int/ext networks/names
       node-external-ip: "{{ ansible_host }}"
       node-external-dns: "{{ k3s_external_dns }}"
       advertise-address: "{{ k3s_private_ip }}"
