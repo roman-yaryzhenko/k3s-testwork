@@ -24,7 +24,7 @@ images:
     newTag: 3eb8781
   - name: order-svc
     newName: ghcr.io/roman-yaryzhenko/order-svc
-    newTag: 3eb8781
+    newTag: broken
 
 configMapGenerator:
   - name: app-config
